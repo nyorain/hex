@@ -1,0 +1,153 @@
+#version 450
+
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_shading_language_420pack : enable
+
+// #define C_N 0
+// #define C_L1 1
+// #define C_L2 2
+// #define C_U 3
+// #define C_R2 4
+// #define C_R1 5
+
+#define C_N 0
+#define C_L1 1
+#define C_L2 2
+#define C_U 3
+#define C_R2 4
+#define C_R1 5
+
+// -------------------------------------------------
+// 0  1  2  3  4  5
+// L2 N  N  L1 L2 L1
+/*
+const int configSize = 6;
+const int config[configSize] = {
+	C_L2, C_N, C_N, C_L1, C_L2, C_L1
+};
+*/
+
+// -------------------------------------------------
+// 0  1  2  3  4  5  6
+// R1 R2 N  U  R2 R1 L2
+/*
+const int configSize = 7;
+const int config[configSize] = {
+	C_R1, C_R2, C_N, C_U, C_R2, C_R1, C_L2
+};
+*/
+
+// -------------------------------------------------
+// L1 L2 N U L2 L1 R2
+/*
+const int configSize = 7;
+const int config[configSize] = {
+	C_L1, C_L2, C_N, C_U, C_L2, C_L1, C_R2
+};
+*/
+
+// symmetric star -------------------------------------------------
+/*
+const int configSize = 2;
+const int config[] = {
+	C_R1, C_L1
+};
+*/
+
+// lines, then noise-like ----------------------------------------
+/*
+const int configSize = 2;
+const int config[] = {
+	C_R2, C_N
+};
+*/
+
+// dropping, builder ant ---------------------------------------
+/*
+const int configSize = 3;
+const int config[] = {
+	C_R2, C_N, C_L2
+};
+*/
+
+// grow, somewhat cyclic -------------------------------------
+/*
+const int configSize = 3;
+const int config[] = {
+	C_R1, C_U, C_L1
+};
+*/
+
+// small, cyclic ------------------------------------------
+/*
+const int configSize = 3;
+const int config[] = {
+	C_U, C_L1, C_R1
+};
+*/
+
+// FIXED ALGO
+// from wikipedia, large cycle
+/*
+const int configSize = 6;
+const int config[configSize] = {
+	C_L2, C_N, C_N, C_L1, C_L2, C_L1
+};
+*/
+
+// settings
+const int iters = 256;
+const int width = 256;
+const int height = 314;
+
+layout(set = 0, binding = 0) buffer Buf {
+	int pos; // position in vals[]
+
+	// rotation, in range 0..5
+	// the ant has the rotation: rotation * 60 degrees (mathematical)
+	int rotation; 
+	int vals[];
+} buf;
+
+void main() {
+	// fetch initial values
+	ivec2 pos = ivec2(buf.pos % width, buf.pos / width);
+	int rot = buf.rotation;
+
+	for(int i = 0; i < iters; ++i) {
+		// fix position, compute id
+		while(pos.x < 0) pos.x += width;
+		while(pos.y < 0) pos.y += height;
+		if(pos.x >= width) pos.x = pos.x % width;
+		if(pos.y >= height) pos.y = pos.y % height;
+
+		int id = pos.y * width + pos.x;
+
+		// update value and rotation
+		int add = config[buf.vals[id]];
+		rot = (rot + add) % 6;
+		buf.vals[id] = (buf.vals[id] + 1) % configSize;
+
+		// apply step
+		ivec2 npos = pos;
+		if(pos.y % 2 == 1) {
+			npos.x += 1;
+		}
+
+		switch(rot) {
+			case 0: npos.x = pos.x + 1; break;
+			case 1: npos.y -= 1; break;
+			case 2: npos.y -= 1; npos.x -= 1; break;
+			case 3: npos.x = pos.x - 1; break;
+			case 4: npos.y += 1; npos.x -= 1; break;
+			case 5: npos.y += 1; break;
+			default: npos = ivec2(0, 0); break;
+		}
+
+		pos = npos;
+	}
+
+	// store final values
+	buf.pos = pos.y * width + pos.x;
+	buf.rotation = rot;
+}
