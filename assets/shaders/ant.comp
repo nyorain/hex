@@ -30,12 +30,10 @@ const int config[configSize] = {
 // -------------------------------------------------
 // 0  1  2  3  4  5  6
 // R1 R2 N  U  R2 R1 L2
-/*
 const int configSize = 7;
 const int config[configSize] = {
 	C_R1, C_R2, C_N, C_U, C_R2, C_R1, C_L2
 };
-*/
 
 // -------------------------------------------------
 // L1 L2 N U L2 L1 R2
