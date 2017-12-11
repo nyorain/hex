@@ -43,7 +43,7 @@ void main() {
 	vec2 offset = values[gl_VertexIndex % 6];
 
 	uv = offset;
-	col = color;
+	col = vec4(color, 0, 1);
 
 	gl_Position = vec4(center + radius * offset, 0.0, 1.0);
 	gl_Position.x /= ratio;

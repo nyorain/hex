@@ -6,37 +6,58 @@
 const int width = 256;
 const int height = 314;
 
+// TODO: delta time
+
 layout(set = 0, binding = 0) buffer BufOld {
 	vec2 vals[];
 } old;
 
 layout(set = 0, binding = 1) buffer BufNew {
 	vec2 vals[];
-} new;
+} _new;
 
 // utility
 // TODO: wrap if out of bounds
 uint idx(uvec2 pos) {
+	if(pos.x >= width || pos.y >= height) return -1;
 	return pos.x + pos.y * width;
 }
 
 uint idx(ivec2 pos) {
+	if(pos.x >= width || pos.y >= height || pos.x < 0 || pos.y < 0) return -1;
 	return pos.x + pos.y * width;
 }
 
+/*
 void wander(uint i1, uint i2) {
 	vec2 o1 = old.vals[i1];
 	vec2 o2 = old.vals[i2];
 
 	// x moving 
-	float diffx = 0.1 * o2.x - o1.x;
-	new.vals[i1].x -= diffx;
-	new.vals[i2].x -= diffx;
+	float diffx = delta * 0.1 * (o2.x - o1.x);
+	old.vals[i1].x += diffx;
+	// new.vals[i1].x += diffx;
+	// new.vals[i2].x -= diffx;
 
 	// y moving
-	float diffy = 0.1 * o2.y - o1.y;
-	new.vals[i1].y -= diffy;
-	new.vals[i2].y -= diffy;
+	float diffy = delta * 0.1 * (o2.y - o1.y);
+	old.vals[i1].y += diffy;
+	// new.vals[i1].y += diffy;
+	// new.vals[i2].y -= diffy;
+}
+*/
+
+void wander(uint i1, uint i2, float x, float y) {
+	if(i2 > width * height) return;
+
+	float dx = old.vals[i2].x - x;
+	float dy = old.vals[i2].y - y;
+
+	old.vals[i2].x -= 0.04 * dx;
+	old.vals[i2].y -= 0.08 * dy * x;
+
+	old.vals[i1].x += 0.04 * dx;
+	old.vals[i1].y += 0.08 * dy * x;
 }
 
 // main
@@ -44,9 +65,29 @@ void main() {
 	// update own values
 	uvec2 pos = gl_GlobalInvocationID.xy;
 	uint id = idx(pos);
+
 	vec2 o = old.vals[id]; 
-	new.vals[id].x += 2 * clamp(1 - o.x, 0, 1) * o.x - 0.1 * o.y;
-	new.vals[id].y += 0.5 * o.y + 0.2 * o.x;
+	float x = o.x;
+	float y = o.y;
+
+	/*
+	if(old.vals[id].x < 0.00001) {
+		old.vals[id].x += 0.01;
+	}
+
+	if(old.vals[id].y < 0.00001) {
+		old.vals[id].y += 0.01;
+	}
+	*/
+
+	old.vals[id].x += (0.01 - (0.02 * y)) * x /** (1 - x)*/;
+	old.vals[id].y += -(0.01 - (0.05 * x)) * y /** (1 - y)*/;
+
+	// new.vals[id].x += 2 * clamp(1 - o.x, 0, 1) * o.x - 0.1 * o.y;
+	// new.vals[id].y += 0.5 * o.y + 0.2 * o.x;
+
+	// new.vals[id].x = old.vals[id].x + 0.0001;
+	// new.vals[id].y = old.vals[id].x + 0.0001;
 
 	// simulate wandering to neighbor cells
 	float offx = 0;
@@ -54,11 +95,17 @@ void main() {
 		offx = 1;
 	}
 
-	wander(id, idx(pos + ivec2(1, 0)));
-	wander(id, idx(pos + ivec2(0, 1)));
+	o = old.vals[id]; 
+	x = o.x;
+	y = o.y;
 
-	wander(id, idx(pos + ivec2(offx, -1)));
-	wander(id, idx(pos + ivec2(offx - 1, -1)));
-	wander(id, idx(pos + ivec2(offx, 1)));
-	wander(id, idx(pos + ivec2(offx - 1, 1)));
+	wander(id, idx(pos + ivec2(1, 0)), x, y);
+	wander(id, idx(pos + ivec2(0, 1)), x, y);
+
+	wander(id, idx(pos + ivec2(offx, -1)), x, y);
+	wander(id, idx(pos + ivec2(offx - 1, -1)), x, y);
+	wander(id, idx(pos + ivec2(offx, 1)), x, y);
+	wander(id, idx(pos + ivec2(offx - 1, 1)), x, y);
+
+	old.vals[id] = clamp(old.vals[id], 0, 1);
 }

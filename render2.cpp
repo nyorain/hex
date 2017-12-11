@@ -20,6 +20,7 @@
 
 constexpr auto hexWidth = 256;
 constexpr unsigned int hexHeight = 314;
+constexpr auto bufSize = sizeof(nytl::Vec2f) * (hexWidth * hexHeight);
 
 vpp::Pipeline createGraphicsPipeline(const vpp::Device&, vk::RenderPass, 
 	vk::PipelineLayout, vk::SampleCountBits);
@@ -82,7 +83,6 @@ Renderer::Renderer(const vpp::Device& dev, vk::SurfaceKHR surface,
 
 	// storage buffer for data
 	auto mem = dev.memoryTypeBits(vk::MemoryPropertyBits::deviceLocal);
-	auto bufSize = sizeof(nytl::Vec2f) * (hexWidth * hexHeight);
 
 	dev.bufferAllocator().reserve(false, 2 * bufSize, {});
 	storage1_ = dev.bufferAllocator().alloc(false,
@@ -99,16 +99,20 @@ Renderer::Renderer(const vpp::Device& dev, vk::SurfaceKHR surface,
 		vk::BufferUsageBits::transferSrc, 0u, mem);
 
 	std::vector<nytl::Vec2f> data(hexWidth * hexHeight);
-	data[10 * hexWidth + 10] = {1.f, 0.f};
-	data[50 * hexWidth + 50] = {0.f, 1.f};
+	data[50 * hexWidth + 50] = {1.f, 1.f};
+
+	data[10 * hexWidth + 10] = {1.f, 1.f};
+	data[120 * hexWidth + 120] = {0.1f, 1.f};
+	data[150 * hexWidth + 20] = {0.1f, 1.f};
+	data[250 * hexWidth + 250] = {1.f, 1.f};
 
 	vpp::writeStaging430(storage1_, vpp::raw(data));
 
 	// update descriptor
 	{
 		vpp::DescriptorSetUpdate update(compDs_);
-		update.storage({{storage1_, 0, bufSize}});
-		update.storage({{storage2_, 0, bufSize}});
+		update.storage({{storage1_.buffer(), storage1_.offset(), bufSize}});
+		update.storage({{storage2_.buffer(), storage2_.offset(), bufSize}});
 	}
 
 	// init renderer
@@ -161,26 +165,38 @@ void Renderer::record(const RenderBuffer& buf)
 	auto cmdBuf = buf.commandBuffer;
 	vk::beginCommandBuffer(cmdBuf, {});
 
-	vk::cmdCopyBuffer...
-	vk::cmdFillBuffer(cmdBuf, storage);
+	// vk::cmdFillBuffer(cmdBuf, storage2_.buffer(), storage2_.offset(), bufSize, 0x0);
 
 	vk::cmdBindPipeline(cmdBuf, vk::PipelineBindPoint::compute, compPipeline_);
 	vk::cmdBindDescriptorSets(cmdBuf, vk::PipelineBindPoint::compute, 
 		compPipelineLayout_, 0, {compDs_}, {});
-	vk::cmdDispatch(cmdBuf, 1, 1, 1);
+	vk::cmdDispatch(cmdBuf, hexWidth, hexHeight, 1);
 
 	vk::BufferMemoryBarrier barrier;
-	barrier.offset = 0u;
-	barrier.buffer = storage_;
-	barrier.size = vk::wholeSize;
+	barrier.offset = storage1_.offset();
+	barrier.buffer = storage1_.buffer();
+	barrier.size = bufSize;
 	barrier.srcAccessMask = vk::AccessBits::shaderWrite;
 	barrier.dstAccessMask = vk::AccessBits::shaderRead;
+
+	vk::BufferMemoryBarrier barrier2;
+	barrier2.offset = storage2_.offset();
+	barrier2.buffer = storage2_.buffer();
+	barrier2.size = bufSize;
+	barrier2.srcAccessMask = vk::AccessBits::shaderWrite;
+	barrier2.dstAccessMask = vk::AccessBits::transferRead;
+
 	vk::cmdPipelineBarrier(
 		cmdBuf,
 		vk::PipelineStageBits::computeShader,
-		vk::PipelineStageBits::fragmentShader,
+		vk::PipelineStageBits::fragmentShader | vk::PipelineStageBits::transfer,
 		{},
-		{}, {barrier}, {});
+		{}, {barrier, barrier2}, {});
+
+	/*
+	vk::cmdCopyBuffer(cmdBuf, storage2_.buffer(), storage1_.buffer(), 
+		{{storage2_.offset(), storage1_.offset(), bufSize}});
+	*/
 
 	/*
 	// not fully working
@@ -215,10 +231,11 @@ void Renderer::record(const RenderBuffer& buf)
 	vk::cmdSetScissor(cmdBuf, 0, 1, {0, 0, width, height});
 
 	vk::cmdBindPipeline(cmdBuf, vk::PipelineBindPoint::graphics, gfxPipeline_);
-	vk::cmdBindVertexBuffers(cmdBuf, 0, {storage_}, {sizeof(int) * 2});
+	vk::cmdBindVertexBuffers(cmdBuf, 0, {storage1_.buffer()}, {storage1_.offset()});
 	vk::cmdDraw(cmdBuf, 6, hexWidth * hexHeight, 0, 0);
 
 	vk::cmdEndRenderPass(cmdBuf);
+
 	vk::endCommandBuffer(cmdBuf);
 }
 
@@ -280,7 +297,7 @@ vpp::Pipeline createGraphicsPipeline(const vpp::Device& device,
 	vk::VertexInputBindingDescription binding;
 	binding.binding = 0;
 	binding.inputRate = vk::VertexInputRate::instance;
-	binding.stride = sizeof(int);
+	binding.stride = sizeof(nytl::Vec2f);
 
 	vk::VertexInputAttributeDescription attribute;
 	attribute.offset = 0;

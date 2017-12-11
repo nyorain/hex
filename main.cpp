@@ -2,7 +2,7 @@
 // Distributed under the Boost Software License, Version 1.0.
 // See accompanying file LICENSE or copy at http://www.boost.org/LICENSE_1_0.txt
 
-#include "render.hpp"
+#include "render2.hpp"
 #include "window.hpp"
 
 #include <ny/backend.hpp>
@@ -78,6 +78,7 @@ int main()
 	// - events - 
 	bool run = true;
 	bool sPressed = true;
+	bool play = false;
 
 	window.onClose = [&](const auto&) { run = false; };
 	window.onKey = [&](const auto& ev) { 
@@ -86,6 +87,8 @@ int main()
 			run = false;
 		} else if(ev.pressed && ev.keycode == ny::Keycode::s) {
 			sPressed = true;
+		} else if(ev.pressed && ev.keycode == ny::Keycode::p) {
+			play = !play;
 		}
 	};
 	window.onResize = [&](const auto& ev) {
@@ -102,16 +105,16 @@ int main()
 	auto secCounter = 0.f;
 
 	while(run) {
-		// if(!appContext->waitEvents()) {
-		if(!appContext->pollEvents()) {
+		bool ret = play ? appContext->pollEvents() : appContext->waitEvents();
+		if(!ret) {
 			dlg_info("pollEvents returned false");
 			return 0;
 		}
 
-		// if(sPressed) {
+		if(sPressed || play) {
 			renderer.renderBlock();
 			sPressed = false;
-		// }
+		}
 
 		if(printFrames) {
 			auto now = Clock::now();
