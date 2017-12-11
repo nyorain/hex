@@ -51,15 +51,40 @@ void main() {
 	int val = gl_InstanceIndex;
 
 	// col = vec4(randf(val), randf(2 * val), randf(-5 * val), 1);
-	switch(value) {
-		case 0: col = vec4(0.01, 0.01, 0.01, 1); break;
-		case 1: col = vec4(0.4, 0.02, 0.0, 1); break;
-		case 2: col = vec4(0.73, 0.18, 0.0, 1); break;
-		case 3: col = vec4(0.8, 0.63, 0.01, 1); break;
-		case 4: col = vec4(.92, .73, .32, 1); break;
-		case 5: col = vec4(1, 0.8, 0.04, 1); break;
-		default: col = vec4(1, 1, 1, 1); break;
+	// colorscheme hot
+	const int configSize = 7;
+	const int step = 3;
+	const int div = value / step;
+	const float fac = (value % step) / float(step);
+
+	vec4 cols[] = {
+		{0.02, 0.02, 0.02, 1},
+		// red up
+		{0.5, 0, 0, 1},
+		{1, 0, 0, 1},
+		// green up
+		{1, 0.5, 0, 1},
+		{1, 1, 0, 1},
+		// blue up
+		{1, 1, 0.5, 1},
+		{1, 1, 1, 1},
+	};
+
+	col = cols[value];
+
+	/*
+	if(value == 0) {
+		col = vec4(0.1, 0.1, 0.1, 1);
+	} else if(div == 0) {
+		col = vec4(fac, 0, 0, 1);
+	} else if(div == 1) {
+		col = vec4(1, fac, 0, 1);
+	} else if(div == 2) {
+		col = vec4(1, 1, fac, 1);
+	} else { // eeeh...
+		col = vec4(0, 0, 1, 1);
 	}
+	*/
 
 	gl_Position = vec4(center + radius * offset, 0.0, 1.0);
 	gl_Position.x /= ratio;

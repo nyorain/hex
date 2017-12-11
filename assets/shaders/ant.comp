@@ -94,7 +94,7 @@ const int config[configSize] = {
 */
 
 // settings
-const int iters = 256;
+const int iters = 16;
 const int width = 256;
 const int height = 314;
 
