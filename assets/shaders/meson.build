@@ -1,7 +1,9 @@
 shaders_src = [
 	'hex.vert',
+	'hex2.vert',
 	'color.frag',
-	'ant.comp'
+	'ant.comp',
+	'automaton.comp'
 ]
 
 shaders = []

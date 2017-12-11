@@ -1,0 +1,64 @@
+#version 450
+
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_shading_language_420pack : enable
+
+const int width = 256;
+const int height = 314;
+
+layout(set = 0, binding = 0) buffer BufOld {
+	vec2 vals[];
+} old;
+
+layout(set = 0, binding = 1) buffer BufNew {
+	vec2 vals[];
+} new;
+
+// utility
+// TODO: wrap if out of bounds
+uint idx(uvec2 pos) {
+	return pos.x + pos.y * width;
+}
+
+uint idx(ivec2 pos) {
+	return pos.x + pos.y * width;
+}
+
+void wander(uint i1, uint i2) {
+	vec2 o1 = old.vals[i1];
+	vec2 o2 = old.vals[i2];
+
+	// x moving 
+	float diffx = 0.1 * o2.x - o1.x;
+	new.vals[i1].x -= diffx;
+	new.vals[i2].x -= diffx;
+
+	// y moving
+	float diffy = 0.1 * o2.y - o1.y;
+	new.vals[i1].y -= diffy;
+	new.vals[i2].y -= diffy;
+}
+
+// main
+void main() {
+	// update own values
+	uvec2 pos = gl_GlobalInvocationID.xy;
+	uint id = idx(pos);
+	vec2 o = old.vals[id]; 
+	new.vals[id].x += 2 * clamp(1 - o.x, 0, 1) * o.x - 0.1 * o.y;
+	new.vals[id].y += 0.5 * o.y + 0.2 * o.x;
+
+	// simulate wandering to neighbor cells
+	float offx = 0;
+	if(pos.y % 2 == 1) {
+		offx = 1;
+	}
+
+	wander(id, idx(pos + ivec2(1, 0)));
+	wander(id, idx(pos + ivec2(0, 1)));
+
+	wander(id, idx(pos + ivec2(offx, -1)));
+	wander(id, idx(pos + ivec2(offx - 1, -1)));
+	wander(id, idx(pos + ivec2(offx, 1)));
+	wander(id, idx(pos + ivec2(offx - 1, 1)));
+}
