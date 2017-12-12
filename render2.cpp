@@ -107,6 +107,7 @@ Renderer::Renderer(const vpp::Device& dev, vk::SurfaceKHR surface,
 	data[250 * hexWidth + 250] = {1.f, 1.f};
 
 	vpp::writeStaging430(storage1_, vpp::raw(data));
+	vpp::writeStaging430(storage2_, vpp::raw(data));
 
 	// update descriptor
 	{
@@ -156,6 +157,14 @@ void Renderer::createMultisampleTarget(const vk::Extent2D& size)
 	multisampleTarget_ = {device(), img, view};
 }
 
+// frame concept (init values are in storage1):
+// - compute: read from storage1 (old buf), write into storage2 (new buf)
+// * barrier: make sure reading from storage1 (from shaders) is finished
+// * barrier: make sure writing into storage2 (from shader) is finished
+// - copy storage2 into storage1 (overwrite old values)
+// * barrier: make sure writing into storage 1 (from transfer) is finished
+// - render: read new values from storage2
+
 void Renderer::record(const RenderBuffer& buf)
 {
 	static const auto clearValue = vk::ClearValue {{0.f, 0.f, 0.f, 1.f}};
@@ -165,38 +174,38 @@ void Renderer::record(const RenderBuffer& buf)
 	auto cmdBuf = buf.commandBuffer;
 	vk::beginCommandBuffer(cmdBuf, {});
 
-	// vk::cmdFillBuffer(cmdBuf, storage2_.buffer(), storage2_.offset(), bufSize, 0x0);
-
 	vk::cmdBindPipeline(cmdBuf, vk::PipelineBindPoint::compute, compPipeline_);
 	vk::cmdBindDescriptorSets(cmdBuf, vk::PipelineBindPoint::compute, 
 		compPipelineLayout_, 0, {compDs_}, {});
 	vk::cmdDispatch(cmdBuf, hexWidth, hexHeight, 1);
 
-	vk::BufferMemoryBarrier barrier;
-	barrier.offset = storage1_.offset();
-	barrier.buffer = storage1_.buffer();
-	barrier.size = bufSize;
-	barrier.srcAccessMask = vk::AccessBits::shaderWrite;
-	barrier.dstAccessMask = vk::AccessBits::shaderRead;
-
-	vk::BufferMemoryBarrier barrier2;
-	barrier2.offset = storage2_.offset();
-	barrier2.buffer = storage2_.buffer();
-	barrier2.size = bufSize;
+	vk::BufferMemoryBarrier barrier1(
+		vk::AccessBits::shaderRead,
+		vk::AccessBits::transferWrite,
+		{}, {}, storage1_.buffer(), storage1_.offset(), bufSize);
+	auto barrier2 = barrier1;
 	barrier2.srcAccessMask = vk::AccessBits::shaderWrite;
 	barrier2.dstAccessMask = vk::AccessBits::transferRead;
+	barrier2.buffer = storage2_.buffer();
+	barrier2.offset = storage2_.offset();
 
 	vk::cmdPipelineBarrier(
 		cmdBuf,
 		vk::PipelineStageBits::computeShader,
-		vk::PipelineStageBits::fragmentShader | vk::PipelineStageBits::transfer,
-		{},
-		{}, {barrier, barrier2}, {});
+		vk::PipelineStageBits::transfer,
+		{}, {}, {barrier1, barrier2}, {});
 
-	/*
 	vk::cmdCopyBuffer(cmdBuf, storage2_.buffer(), storage1_.buffer(), 
 		{{storage2_.offset(), storage1_.offset(), bufSize}});
-	*/
+
+	auto barrier3 = barrier1;
+	barrier3.srcAccessMask = vk::AccessBits::transferWrite;
+	barrier3.dstAccessMask = vk::AccessBits::shaderRead;
+	vk::cmdPipelineBarrier(
+		cmdBuf,
+		vk::PipelineStageBits::transfer,
+		vk::PipelineStageBits::fragmentShader,
+		{}, {}, {barrier3}, {});
 
 	/*
 	// not fully working

@@ -6,7 +6,7 @@
 const int width = 256;
 const int height = 314;
 
-// TODO: delta time
+// TODO: delta time?
 
 layout(set = 0, binding = 0) buffer BufOld {
 	vec2 vals[];
@@ -14,10 +14,9 @@ layout(set = 0, binding = 0) buffer BufOld {
 
 layout(set = 0, binding = 1) buffer BufNew {
 	vec2 vals[];
-} _new;
+} new;
 
 // utility
-// TODO: wrap if out of bounds
 uint idx(uvec2 pos) {
 	if(pos.x >= width || pos.y >= height) return -1;
 	return pos.x + pos.y * width;
@@ -53,11 +52,11 @@ void wander(uint i1, uint i2, float x, float y) {
 	float dx = old.vals[i2].x - x;
 	float dy = old.vals[i2].y - y;
 
-	old.vals[i2].x -= 0.04 * dx;
-	old.vals[i2].y -= 0.08 * dy * x;
+	new.vals[i2].x -= 0.04 * dx;
+	new.vals[i2].y -= 0.08 * dy * x;
 
-	old.vals[i1].x += 0.04 * dx;
-	old.vals[i1].y += 0.08 * dy * x;
+	new.vals[i1].x += 0.04 * dx;
+	new.vals[i1].y += 0.08 * dy * x;
 }
 
 // main
@@ -72,16 +71,16 @@ void main() {
 
 	/*
 	if(old.vals[id].x < 0.00001) {
-		old.vals[id].x += 0.01;
+		new.vals[id].x += 0.01;
 	}
 
 	if(old.vals[id].y < 0.00001) {
-		old.vals[id].y += 0.01;
+		new.vals[id].y += 0.01;
 	}
 	*/
 
-	old.vals[id].x += (0.01 - (0.02 * y)) * x /** (1 - x)*/;
-	old.vals[id].y += -(0.01 - (0.05 * x)) * y /** (1 - y)*/;
+	new.vals[id].x += (0.01 - (0.02 * y)) * x /** (1 - x)*/;
+	new.vals[id].y += -(0.01 - (0.05 * x)) * y /** (1 - y)*/;
 
 	// new.vals[id].x += 2 * clamp(1 - o.x, 0, 1) * o.x - 0.1 * o.y;
 	// new.vals[id].y += 0.5 * o.y + 0.2 * o.x;
@@ -107,5 +106,5 @@ void main() {
 	wander(id, idx(pos + ivec2(offx, 1)), x, y);
 	wander(id, idx(pos + ivec2(offx - 1, 1)), x, y);
 
-	old.vals[id] = clamp(old.vals[id], 0, 1);
+	new.vals[id] = clamp(new.vals[id], 0, 1);
 }
