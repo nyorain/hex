@@ -7,7 +7,7 @@ layout(location = 0) in int value;
 layout(location = 0) out vec2 uv;
 layout(location = 1) out vec4 col;
 
-const int perRow = 256;
+const int perRow = 128;
 const float cospi6 = 0.866025;
 const float radius = (1.f / perRow) / cospi6;
 const float ratio = 1920.f / 1080.f;

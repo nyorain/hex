@@ -34,6 +34,8 @@ protected:
 	void record(const RenderBuffer&) override;
 	void initBuffers(const vk::Extent2D&, nytl::Span<RenderBuffer>) override;
 
+	void createGraphicsPipeline(const vpp::Device& device);
+
 protected:
 	vpp::ViewableImage multisampleTarget_;
 	vpp::RenderPass renderPass_;
@@ -41,6 +43,7 @@ protected:
 	vk::SwapchainCreateInfoKHR scInfo_;
 
 	vpp::Pipeline gfxPipeline_;
+	vpp::Pipeline linePipeline_;
 	vpp::PipelineLayout gfxPipelineLayout_;
 
 	vpp::Buffer storage_;

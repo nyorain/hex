@@ -57,8 +57,8 @@ shader_inc = include_directories('assets') # for headers in build folder
 src = [
 	shaders,
 	'main.cpp',
-	# 'render.cpp',
-	'render2.cpp',
+	'render.cpp',
+	# 'render2.cpp',
 	'window.cpp']
 
 executable('hex', src,

@@ -95,8 +95,8 @@ const int config[configSize] = {
 
 // settings
 const int iters = 16;
-const int width = 256;
-const int height = 314;
+const int width = 128;
+const int height = 157;
 
 layout(set = 0, binding = 0) buffer Buf {
 	int pos; // position in vals[]
@@ -144,6 +144,11 @@ void main() {
 
 		pos = npos;
 	}
+	
+	while(pos.x < 0) pos.x += width;
+	while(pos.y < 0) pos.y += height;
+	if(pos.x >= width) pos.x = pos.x % width;
+	if(pos.y >= height) pos.y = pos.y % height;
 
 	// store final values
 	buf.pos = pos.y * width + pos.x;

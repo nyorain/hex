@@ -16,6 +16,8 @@
 // shader data
 #include <shaders/hex.vert.h>
 #include <shaders/color.frag.h>
+#include <shaders/hexLine.vert.h>
+#include <shaders/black.frag.h>
 #include <shaders/ant.comp.h>
 
 constexpr std::int32_t mceil(float num) {
@@ -26,11 +28,9 @@ constexpr std::int32_t mceil(float num) {
     return inum + (num > 0 ? 1 : 0);
 }
 
-constexpr auto hexWidth = 256;
-constexpr unsigned int hexHeight = mceil(hexWidth * 1.22474487139);
+constexpr auto hexWidth = 128;
+constexpr unsigned int hexHeight = 157;
 
-vpp::Pipeline createGraphicsPipeline(const vpp::Device&, vk::RenderPass, 
-	vk::PipelineLayout, vk::SampleCountBits);
 vpp::RenderPass createRenderPass(const vpp::Device&, vk::Format, 
 	vk::SampleCountBits);
 
@@ -45,8 +45,7 @@ Renderer::Renderer(const vpp::Device& dev, vk::SurfaceKHR surface,
 
 	gfxPipelineLayout_ = {dev, {}, {}};
 	renderPass_ = createRenderPass(dev, scInfo_.imageFormat, samples);
-	gfxPipeline_ = createGraphicsPipeline(dev, renderPass_, 
-		gfxPipelineLayout_, sampleCount_);
+	createGraphicsPipeline(dev);
 
 	// compute
 	// pool 
@@ -210,6 +209,9 @@ void Renderer::record(const RenderBuffer& buf)
 	vk::cmdBindVertexBuffers(cmdBuf, 0, {storage_}, {sizeof(int) * 2});
 	vk::cmdDraw(cmdBuf, 6, hexWidth * hexHeight, 0, 0);
 
+	vk::cmdBindPipeline(cmdBuf, vk::PipelineBindPoint::graphics, linePipeline_);
+	vk::cmdDraw(cmdBuf, 6, hexWidth * hexHeight, 0, 0);
+
 	vk::cmdEndRenderPass(cmdBuf);
 	vk::endCommandBuffer(cmdBuf);
 }
@@ -228,8 +230,7 @@ void Renderer::samples(vk::SampleCountBits samples)
 
 	renderPass_ = createRenderPass(device(), scInfo_.imageFormat, samples);
 	vpp::DefaultRenderer::renderPass_ = renderPass_;
-	gfxPipeline_ = createGraphicsPipeline(device(), renderPass_, 
-		gfxPipelineLayout_, sampleCount_);
+	createGraphicsPipeline(device());
 
 	initBuffers(scInfo_.imageExtent, renderBuffers_);
 	invalidate();
@@ -248,9 +249,7 @@ void Renderer::initBuffers(const vk::Extent2D& size,
 }
 
 // utility
-vpp::Pipeline createGraphicsPipeline(const vpp::Device& device,
-	vk::RenderPass renderPass, vk::PipelineLayout layout, 
-	vk::SampleCountBits sampleCount)
+void Renderer::createGraphicsPipeline(const vpp::Device& device)
 {
 	// auto msaa = sampleCount != vk::SampleCountBits::e1;
 	auto lightVertex = vpp::ShaderModule(device, hex_vert_data);
@@ -261,10 +260,11 @@ vpp::Pipeline createGraphicsPipeline(const vpp::Device& device,
 		{lightFragment, vk::ShaderStageBits::fragment}
 	});
 
-	vk::GraphicsPipelineCreateInfo trianglePipe;
+	vk::GraphicsPipelineCreateInfo pipeInfos[2];
+	auto& trianglePipe = pipeInfos[0];
 
-	trianglePipe.renderPass = renderPass;
-	trianglePipe.layout = layout;
+	trianglePipe.renderPass = renderPass_;
+	trianglePipe.layout = gfxPipelineLayout_;
 
 	trianglePipe.stageCount = lightStages.vkStageInfos().size();
 	trianglePipe.pStages = lightStages.vkStageInfos().data();
@@ -302,7 +302,7 @@ vpp::Pipeline createGraphicsPipeline(const vpp::Device& device,
 	trianglePipe.pRasterizationState = &rasterizationInfo;
 
 	vk::PipelineMultisampleStateCreateInfo multisampleInfo;
-	multisampleInfo.rasterizationSamples = sampleCount;
+	multisampleInfo.rasterizationSamples = sampleCount_;
 	multisampleInfo.sampleShadingEnable = false;
 	multisampleInfo.alphaToCoverageEnable = false;
 	trianglePipe.pMultisampleState = &multisampleInfo;
@@ -337,15 +337,37 @@ vpp::Pipeline createGraphicsPipeline(const vpp::Device& device,
 	dynamicInfo.pDynamicStates = dynStates.begin();
 	trianglePipe.pDynamicState = &dynamicInfo;
 
+	//
+	auto lineVertex = vpp::ShaderModule(device, hexLine_vert_data);
+	auto lineFragment = vpp::ShaderModule(device, black_frag_data);
+
+	auto& linePipe = pipeInfos[1];
+	linePipe = trianglePipe;
+
+	vpp::ShaderProgram lineStages({
+		{lineVertex, vk::ShaderStageBits::vertex},
+		{lineFragment, vk::ShaderStageBits::fragment}
+	});
+
+	vk::PipelineVertexInputStateCreateInfo vertexInfo2 {};
+	vk::PipelineInputAssemblyStateCreateInfo assemblyInfo2;
+	assemblyInfo2.topology = vk::PrimitiveTopology::lineStrip;
+
+	linePipe.pInputAssemblyState = &assemblyInfo2;
+	linePipe.pVertexInputState = &vertexInfo2;
+	linePipe.stageCount = lineStages.vkStageInfos().size();
+	linePipe.pStages = lineStages.vkStageInfos().data();
+
 	// setup cache
 	constexpr auto cacheName = "graphicsCache.bin";
 	vpp::PipelineCache cache {device, cacheName};
 
-	vk::Pipeline ret;
-	vk::createGraphicsPipelines(device, cache, 1, trianglePipe, nullptr, ret);
+	vk::Pipeline pipes[2];
+	vk::createGraphicsPipelines(device, cache, 2, *pipeInfos, nullptr, *pipes);
 	vpp::save(cache, cacheName);
 
-	return {device, ret};
+	gfxPipeline_ = {device, pipes[0]};
+	linePipeline_ = {device, pipes[1]};
 }
 
 vpp::RenderPass createRenderPass(const vpp::Device& dev,
